@@ -2,6 +2,8 @@ import './style.css'
 import { api } from './api/client'
 
 // Global state
+let currentColumns: string[] = [];
+let currentResults: Record<string, any>[] = [];
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeFileUpload();
   initializeModal();
   initializeRandomQueryButton();
+  initializeResultsDownload();
   loadDatabaseSchema();
 });
 
@@ -114,6 +117,16 @@ function initializeRandomQueryButton() {
   });
 }
 
+// Results Download Button
+function initializeResultsDownload() {
+  const downloadButton = document.getElementById('download-results') as HTMLButtonElement;
+  downloadButton.addEventListener('click', () => {
+    if (currentColumns.length > 0) {
+      api.exportResults(currentColumns, currentResults);
+    }
+  });
+}
+
 // File Upload Functionality
 function initializeFileUpload() {
   const dropZone = document.getElementById('drop-zone') as HTMLDivElement;
@@ -182,13 +195,18 @@ async function loadDatabaseSchema() {
 
 // Display query results
 function displayResults(response: QueryResponse, query: string) {
-  
+
   const resultsSection = document.getElementById('results-section') as HTMLElement;
   const sqlDisplay = document.getElementById('sql-display') as HTMLDivElement;
   const resultsContainer = document.getElementById('results-container') as HTMLDivElement;
-  
+  const downloadButton = document.getElementById('download-results') as HTMLButtonElement;
+
+  // Store current results for export
+  currentColumns = response.columns;
+  currentResults = response.results;
+
   resultsSection.style.display = 'block';
-  
+
   // Display natural language query and SQL
   sqlDisplay.innerHTML = `
     <div class="query-display">
@@ -198,18 +216,21 @@ function displayResults(response: QueryResponse, query: string) {
       <strong>SQL:</strong> <code>${response.sql}</code>
     </div>
   `;
-  
+
   // Display results table
   if (response.error) {
     resultsContainer.innerHTML = `<div class="error-message">${response.error}</div>`;
+    downloadButton.style.display = 'none';
   } else if (response.results.length === 0) {
     resultsContainer.innerHTML = '<p>No results found.</p>';
+    downloadButton.style.display = 'none';
   } else {
     const table = createResultsTable(response.results, response.columns);
     resultsContainer.innerHTML = '';
     resultsContainer.appendChild(table);
+    downloadButton.style.display = 'inline-flex';
   }
-  
+
   // Initialize toggle button
   const toggleButton = document.getElementById('toggle-results') as HTMLButtonElement;
   toggleButton.addEventListener('click', () => {
@@ -285,14 +306,27 @@ function displayTables(tables: TableSchema[]) {
     tableLeft.appendChild(tableName);
     tableLeft.appendChild(tableInfo);
     
+    const downloadButton = document.createElement('button');
+    downloadButton.className = 'download-table-button';
+    downloadButton.innerHTML = '↓';
+    downloadButton.title = 'Export as CSV';
+    downloadButton.onclick = () => api.exportTable(table.name);
+
     const removeButton = document.createElement('button');
     removeButton.className = 'remove-table-button';
     removeButton.innerHTML = '&times;';
     removeButton.title = 'Remove table';
     removeButton.onclick = () => removeTable(table.name);
-    
+
+    const headerButtons = document.createElement('div');
+    headerButtons.style.display = 'flex';
+    headerButtons.style.alignItems = 'center';
+    headerButtons.style.gap = '0.25rem';
+    headerButtons.appendChild(downloadButton);
+    headerButtons.appendChild(removeButton);
+
     tableHeader.appendChild(tableLeft);
-    tableHeader.appendChild(removeButton);
+    tableHeader.appendChild(headerButtons);
     
     // Columns section
     const tableColumns = document.createElement('div');

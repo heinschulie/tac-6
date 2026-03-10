@@ -1,6 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import StreamingResponse
 from datetime import datetime
+import csv
+import io
 import os
 import sqlite3
 import traceback
@@ -18,7 +21,8 @@ from core.data_models import (
     HealthCheckResponse,
     TableSchema,
     ColumnInfo,
-    RandomQueryResponse
+    RandomQueryResponse,
+    ExportResultsRequest
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -303,6 +307,75 @@ async def delete_table(table_name: str):
         logger.error(f"[ERROR] Table deletion failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(500, f"Error deleting table: {str(e)}")
+
+@app.get("/api/table/{table_name}/export")
+async def export_table(table_name: str):
+    """Export a table as CSV"""
+    try:
+        try:
+            validate_identifier(table_name, "table")
+        except SQLSecurityError as e:
+            raise HTTPException(400, str(e))
+
+        conn = sqlite3.connect("db/database.db")
+
+        if not check_table_exists(conn, table_name):
+            conn.close()
+            raise HTTPException(404, f"Table '{table_name}' not found")
+
+        result = execute_sql_safely(f"SELECT * FROM {table_name}")
+
+        if result['error']:
+            conn.close()
+            raise Exception(result['error'])
+
+        columns = result['columns']
+        if not columns:
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = [row[1] for row in cursor.fetchall()]
+
+        conn.close()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(columns)
+        for row in result['results']:
+            writer.writerow([row.get(col, '') for col in columns])
+
+        output.seek(0)
+        logger.info(f"[SUCCESS] Table exported: {table_name}")
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{table_name}.csv"'}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Table export failed: {str(e)}")
+        raise HTTPException(500, f"Error exporting table: {str(e)}")
+
+@app.post("/api/export-results")
+async def export_results(request: ExportResultsRequest):
+    """Export query results as CSV"""
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(request.columns)
+        for row in request.results:
+            writer.writerow([row.get(col, '') for col in request.columns])
+
+        output.seek(0)
+        logger.info(f"[SUCCESS] Results exported: {len(request.results)} rows")
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="query_results.csv"'}
+        )
+    except Exception as e:
+        logger.error(f"[ERROR] Results export failed: {str(e)}")
+        raise HTTPException(500, f"Error exporting results: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
