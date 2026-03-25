@@ -161,6 +161,30 @@ h2 {
   margin-bottom: 1rem;
 }
 
+.results-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.download-results-button {
+  background: var(--text-secondary);
+  color: white;
+  border: none;
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.download-results-button:hover {
+  background: var(--primary-color);
+}
+
 .sql-display {
   background: #f8f9fa;
   border: 1px solid var(--border-color);
@@ -311,6 +335,26 @@ h2 {
   color: var(--primary-color);
   font-size: 0.75rem;
   margin-left: 0.25rem;
+}
+
+.download-table-button {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.download-table-button:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: var(--primary-color);
 }
 
 .remove-table-button {

@@ -76,6 +76,12 @@ interface RandomQueryResponse {
   error?: string;
 }
 
+// CSV Export Types
+interface ExportResultsRequest {
+  columns: string[];
+  results: Record<string, any>[];
+}
+
 // Health Check Types
 interface HealthCheckResponse {
   status: "ok" | "error";
